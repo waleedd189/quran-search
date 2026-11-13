@@ -113,7 +113,12 @@ mark{background:var(--h1-bg);color:var(--h1);border-radius:3px}
 mark.m2{background:var(--h2-bg);color:var(--h2)}
 .ay-m{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:4px;font-size:.85rem;color:var(--muted)}
 .ay-m .ref{font-weight:600;text-decoration:none}
-.ay-a{display:flex;align-items:center;gap:8px;margin-inline-start:auto}
+.ay-a{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:2px 8px;margin-inline-start:auto}
+mark.sm{background:var(--brand-soft);color:var(--brand)}
+mark.df{background:var(--h1-bg);color:var(--h1)}
+.simb{background:var(--gold-soft);color:var(--ink);border-radius:999px;padding:1px 9px;font-size:.78rem;font-variant-numeric:tabular-nums}
+.legend2{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;font-size:.85rem;color:var(--muted)}
+.legend2 mark{padding:1px 6px}
 .chip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);background:var(--surface-2);border-radius:999px;padding:4px 11px;font-size:.82rem;min-height:32px;color:var(--ink)}
 .chip i{width:10px;height:10px;border-radius:50%;background:var(--s0);border:1px solid var(--line)}
 [data-l="1"]>i{background:var(--s1)} [data-l="2"]>i{background:var(--s2)} [data-l="3"]>i{background:var(--s3)} [data-l="4"]>i{background:var(--s4)} [data-l="5"]>i{background:var(--s5)}
@@ -215,6 +220,8 @@ textarea.field{min-height:90px;font-size:.8rem;direction:ltr;font-family:ui-mono
 
   <section id="v-sura" class="view" hidden></section>
 
+  <section id="v-similar" class="view" hidden></section>
+
   <section id="v-track" class="view" hidden>
     <div class="panel" id="sum"></div>
     <p class="note" id="store-warn" hidden>هذا المتصفح لا يسمح بالحفظ، فالمتابعة ستضيع عند إغلاق الصفحة.</p>
@@ -227,6 +234,7 @@ textarea.field{min-height:90px;font-size:.8rem;direction:ltr;font-family:ui-mono
     <div class="panel">
       <h3>عن التطبيق</h3>
       <p>للبحث عن المتشابهات في القرآن الكريم لتسهيل الحفظ، مع تفسير مختصر لكل آية ومتابعة لمراحل الحفظ الخمس.</p>
+      <p>زر «متشابهات» تحت أي آية يعرض الآيات القريبة منها في اللفظ، مرتبة من الأقرب، مع تلوين المشترك والمختلف.</p>
       <p>البحث يتجاهل التشكيل. إذا كتبت «ان» بدون همزة ظهرت لك «إن» و«أن» معًا، وإذا كتبت «إن» بالهمزة ظهرت هي فقط، وهذا مفيد في المتشابهات. ونفس القاعدة مع الهاء والتاء المربوطة، ومع الياء والألف المقصورة.</p>
     </div>
     <div class="panel">
@@ -323,13 +331,14 @@ function saveProgress(){try{localStorage.setItem(KEY,JSON.stringify(dumpProgress
 const lvl=a=>P[a.s][a.a-1];
 
 /* ---------- ayah row ---------- */
-function row(a,re,cls){
-  const L=lvl(a),s=SURAS[a.s-1];
-  return '<article class="ay" data-i="'+a.i+'"><p class="ay-t">'+(re?highlight(a.x,re,cls):esc(a.x))+' <span class="ay-n"><b>'+N(a.a)+'</b></span></p>'+
-    '<div class="ay-m">'+(re?'<a class="ref" href="#sura-'+a.s+'-'+a.a+'">'+s.name+' '+N(a.a)+'</a>':'')+
-    '<span>جزء '+N(a.j)+' · صفحة '+N(a.p)+'</span><span class="ay-a">'+
+function row(a,re,cls,o){
+  const L=lvl(a),s=SURAS[a.s-1];o=o||{};
+  return '<article class="ay" data-i="'+a.i+'"><p class="ay-t">'+(o.html||(re?highlight(a.x,re,cls):esc(a.x)))+' <span class="ay-n"><b>'+N(a.a)+'</b></span></p>'+
+    '<div class="ay-m">'+(re||o.ref?'<a class="ref" href="#sura-'+a.s+'-'+a.a+'">'+s.name+' '+N(a.a)+'</a>':'')+
+    '<span>جزء '+N(a.j)+' · صفحة '+N(a.p)+'</span>'+(o.badge?'<span class="simb">'+o.badge+'</span>':'')+'<span class="ay-a">'+
     '<button class="chip" type="button" data-act="stage" data-l="'+L+'"><i></i><span>'+STAGES[L]+'</span></button>'+
-    '<button class="lnk" type="button" data-act="play">استماع</button><button class="lnk" type="button" data-act="taf" aria-expanded="false">التفسير</button></span></div><div class="taf" hidden></div></article>';
+    '<button class="lnk" type="button" data-act="play">استماع</button><button class="lnk" type="button" data-act="taf" aria-expanded="false">التفسير</button>'+
+    (o.self?'':'<a class="lnk" href="#similar-'+a.s+'-'+a.a+'">متشابهات</a>')+'</span></div><div class="taf" hidden></div></article>';
 }
 async function toggleTafsir(art,btn){
   const box=$('.taf',art);
@@ -367,6 +376,67 @@ function moreResults(){
   $('#results').insertAdjacentHTML('beforeend',part.map(a=>row(a,S.re,S.cls)).join(''));
   S.shown+=part.length;const left=S.res.length-S.shown;
   $('#more').hidden=left<=0;$('#more').textContent='عرض المزيد ('+N(left)+' آية باقية)';
+}
+
+/* ---------- similar ayat (shared 3-word phrases, compared without tashkeel but with hamza kept) ---------- */
+let TRI=null,BI=null;const SIM={a:null,L:[],shown:0};
+function buildTri(){
+  if(TRI)return;TRI=new Map();BI=new Map();
+  const add=(M,k,seen,i)=>{if(seen.has(k))return;seen.add(k);let p=M.get(k);if(!p)M.set(k,p=[]);p.push(i)};
+  for(const a of AY){
+    a.w=a.n.split(' ');const s3=new Set(),s2=new Set();
+    for(let i=0;i+1<a.w.length;i++){add(BI,a.w[i]+' '+a.w[i+1],s2,a.i);if(i+2<a.w.length)add(TRI,a.w[i]+' '+a.w[i+1]+' '+a.w[i+2],s3,a.i)}
+    a.tk=[...s3];a.bk=[...s2];
+  }
+}
+/* candidates share a 3-word phrase, or two 2-word phrases; ranked by the share of words in common, in order */
+function similar(a){
+  buildTri();
+  if(a.w.length<3)return AY.filter(b=>b!==a&&b.n===a.n).map(b=>({a:b,sim:1}));
+  const c3=new Set(),c2=new Map();
+  for(const k of a.tk)for(const i of TRI.get(k))if(i!==a.i)c3.add(i);
+  for(const k of a.bk)for(const i of BI.get(k))if(i!==a.i)c2.set(i,(c2.get(i)||0)+1);
+  const out=[];
+  for(const [i,c] of c2){
+    if(!c3.has(i)&&c<2)continue;
+    const b=AY[i],l=lcsMask(a.w,b.w).filter(Boolean).length,sim=2*l/(a.w.length+b.w.length);
+    if(c3.has(i)||sim>=.4)out.push({a:b,sim});
+  }
+  return out.sort((x,y)=>y.sim-x.sim||x.a.i-y.a.i);
+}
+function lcsMask(A,B){
+  const n=A.length,m=B.length,W=m+1,d=new Uint16Array((n+1)*W);
+  for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)d[i*W+j]=A[i]===B[j]?d[(i+1)*W+j+1]+1:Math.max(d[(i+1)*W+j],d[i*W+j+1]);
+  const mask=new Array(m).fill(false);let i=0,j=0;
+  while(i<n&&j<m){if(A[i]===B[j]){mask[j]=true;i++;j++}else if(d[(i+1)*W+j]>=d[i*W+j+1])i++;else j++}
+  return mask;
+}
+function simHTML(t,b,sim){
+  const disp=b.x.split(/\s+/);if(disp.length!==b.w.length)return esc(b.x);
+  const mask=lcsMask(t.w,b.w),near=sim>=.5;
+  if(!near)for(let j=0;j<mask.length;j++)if(mask[j]&&!mask[j-1]&&!mask[j+1])mask[j]=false;
+  let o='',k=0;
+  while(k<disp.length){
+    const c=mask[k]?'sm':(near?'df':'');let e=k;while(e<disp.length&&(mask[e]?'sm':(near?'df':''))===c)e++;
+    const txt=esc(disp.slice(k,e).join(' '));o+=(k?' ':'')+(c?'<mark class="'+c+'">'+txt+'</mark>':txt);k=e;
+  }
+  return o;
+}
+function renderSimilar(s,ay){
+  const a=AY[START[s]+ay-1],L=similar(a);SIM.a=a;SIM.L=L;SIM.shown=0;
+  $('#v-similar').innerHTML='<div class="oprow"><button class="lnk" type="button" data-act="back">→ رجوع</button></div>'+
+    '<h2>متشابهات '+SURAS[s-1].name+' '+N(ay)+'</h2><div class="list">'+row(a,null,null,{ref:true,self:true})+'</div>'+
+    (L.length?'<div class="count"><span><b>'+N(L.length)+'</b> آية متشابهة، الأقرب أولًا</span></div>'+
+      '<p class="legend2"><span><mark class="sm">مشترك مع الآية</mark></span><span><mark class="df">مختلف عنها</mark> (في الآيات القريبة جدًا)</span></p>'+
+      '<div class="list" id="sim-list"></div><button class="btn ghost more" id="sim-more" type="button" data-act="simmore" hidden></button>'
+     :'<p class="note">لا توجد آيات قريبة في اللفظ من هذه الآية.</p>');
+  if(L.length)moreSimilar();
+}
+function moreSimilar(){
+  const part=SIM.L.slice(SIM.shown,SIM.shown+25);
+  $('#sim-list').insertAdjacentHTML('beforeend',part.map(r=>row(r.a,null,null,{ref:true,html:simHTML(SIM.a,r.a,r.sim),badge:'تشابه '+N(Math.max(1,Math.round(r.sim*100)))+'٪'})).join(''));
+  SIM.shown+=part.length;const left=SIM.L.length-SIM.shown,b=$('#sim-more');
+  b.hidden=left<=0;b.textContent='عرض المزيد ('+N(left)+' آية باقية)';
 }
 
 /* ---------- suras ---------- */
@@ -543,17 +613,19 @@ let view='';const scrolls={};
 function show(name,a,b){
   const main=$('#main');if(view)scrolls[view]=main.scrollTop;
   for(const v of $$('.view'))v.hidden=v.id!=='v-'+name;
-  for(const t of $$('.tabs a'))t.dataset.tab===(name==='sura'?'quran':name)?t.setAttribute('aria-current','page'):t.removeAttribute('aria-current');
+  for(const t of $$('.tabs a'))t.dataset.tab===(name==='sura'?'quran':name==='similar'?'search':name)?t.setAttribute('aria-current','page'):t.removeAttribute('aria-current');
   const prev=view;view=name;
   if(name==='quran')renderSuraList();
   if(name==='track')renderTrack();
   if(name==='about')$('#bk').value=JSON.stringify(dumpProgress());
+  if(name==='similar'){renderSimilar(a,b);main.scrollTop=0;return}
   if(name==='sura'){const fresh=curSura!==a;renderSura(a,b);if(b)return;main.scrollTop=fresh||prev!=='sura'?0:scrolls.sura||0;return}
   main.scrollTop=scrolls[name]||0;
 }
 function route(){
   const h=location.hash.slice(1);let m;
   if((m=h.match(/^sura-(\d+)(?:-(\d+))?$/))&&SURAS[m[1]-1])show('sura',+m[1],Math.min(+m[2]||0,SURAS[m[1]-1].c));
+  else if((m=h.match(/^similar-(\d+)-(\d+)$/))&&SURAS[m[1]-1]&&+m[2]>=1&&+m[2]<=SURAS[m[1]-1].c)show('similar',+m[1],+m[2]);
   else show(['quran','track','about'].includes(h)?h:'search');
 }
 
@@ -571,6 +643,8 @@ function wire(){
     const b=e.target.closest('[data-act]');if(!b)return;
     if(b.dataset.act==='taf')toggleTafsir(b.closest('.ay'),b);
     else if(b.dataset.act==='play')playAyah(AY[b.closest('.ay').dataset.i]);
+    else if(b.dataset.act==='back')history.length>1?history.back():(location.hash='#search');
+    else if(b.dataset.act==='simmore')moreSimilar();
     else if(b.dataset.act==='range')openStage({mode:'range',s:+b.dataset.s});
     else{const a=AY[(b.closest('[data-i]')).dataset.i];openStage({mode:'one',s:a.s,a:a.a})}
   });
