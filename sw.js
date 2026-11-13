@@ -1,5 +1,5 @@
 // Offline cache. Bump VERSION whenever any file changes so phones pick up the update.
-const VERSION = 'v2';
+const VERSION = 'v3';
 const FILES = ['./', 'index.html', 'quran.json', 'tafsir.json', 'manifest.webmanifest',
   'fonts/amiri-400.woff2', 'fonts/plex-400.woff2', 'fonts/plex-600.woff2', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
