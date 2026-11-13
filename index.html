@@ -115,6 +115,13 @@ select.field{padding-inline:8px}
 .term.t1::before{background:var(--h1)} .term.t2::before{background:var(--h2)}
 .term.t1 .field{color:var(--h1)} .term.t2 .field{color:var(--h2)}
 .term .field::placeholder{color:var(--muted);opacity:1}
+.term .field{padding-inline-end:48px}
+.term input[type=search]::-webkit-search-cancel-button{display:none}
+.mic{position:absolute;inset-inline-end:5px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;padding:0}
+.mic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mic.on{background:var(--h1);color:#fff}
+@media (prefers-reduced-motion:no-preference){.mic.on{animation:micPulse 1.3s ease-in-out infinite}}
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--h1) 45%,transparent)}50%{box-shadow:0 0 0 9px transparent}}
 .oprow{display:flex;align-items:center;gap:10px}
 .seg{display:inline-flex;border:1.5px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface);padding:3px;gap:2px}
 .seg button{border:0;background:none;padding:5px 18px;min-height:36px;color:var(--muted);border-radius:999px}
@@ -240,16 +247,17 @@ textarea.field{min-height:90px;font-size:.8rem;direction:ltr;font-family:ui-mono
 
   <section id="v-search" class="view" hidden>
     <form id="sf" class="sform" autocomplete="off">
-      <div class="term t1"><input class="field" id="q1" type="search" enterkeyhint="search" placeholder="الكلمة الأولى" aria-label="الكلمة الأولى"></div>
+      <div class="term t1"><input class="field" id="q1" type="search" enterkeyhint="search" placeholder="الكلمة الأولى" aria-label="الكلمة الأولى"><button class="mic" type="button" data-mic="q1" aria-label="بحث بالصوت عن الكلمة الأولى" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg></button></div>
       <div class="oprow"><div class="seg" role="group" aria-label="طريقة الجمع بين الكلمتين">
         <button type="button" id="op-or" data-op="or" aria-pressed="true">أو</button><button type="button" id="op-and" data-op="and" aria-pressed="false">و</button></div></div>
-      <div class="term t2"><input class="field" id="q2" type="search" enterkeyhint="search" placeholder="الكلمة الثانية (اختياري)" aria-label="الكلمة الثانية"></div>
+      <div class="term t2"><input class="field" id="q2" type="search" enterkeyhint="search" placeholder="الكلمة الثانية (اختياري)" aria-label="الكلمة الثانية"><button class="mic" type="button" data-mic="q2" aria-label="بحث بالصوت عن الكلمة الثانية" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg></button></div>
       <div class="filters">
         <select class="field" id="fs" aria-label="السورة"></select>
         <select class="field" id="fj" aria-label="الجزء"></select>
       </div>
     </form>
     <p class="note" id="ex-note">مثال من الملف الأصلي: الفرق بين «سجيل» و«سجين». امسح الخانتين واكتب ما تريد.</p>
+    <p class="note" id="voice-note" aria-live="polite" hidden></p>
     <div class="count" id="count" aria-live="polite"></div>
     <div class="list" id="results" hidden></div>
     <button class="btn ghost more" id="more" type="button" hidden>عرض المزيد</button>
@@ -290,6 +298,7 @@ textarea.field{min-height:90px;font-size:.8rem;direction:ltr;font-family:ui-mono
       <h3>عن التطبيق</h3>
       <p>للبحث عن المتشابهات في القرآن الكريم لتسهيل الحفظ، مع تفسير مختصر لكل آية ومتابعة لمراحل الحفظ الخمس.</p>
       <p>زر «متشابهات» تحت أي آية يعرض الآيات القريبة منها في اللفظ، مرتبة من الأقرب، مع تلوين المشترك والمختلف.</p>
+      <p>زر الميكروفون في خانة البحث يكتب ما تقوله ويبحث عنه، ويحتاج اتصالًا بالإنترنت وإذن الميكروفون، ولا يعمل في كل المتصفحات.</p>
       <p>البحث يتجاهل التشكيل. إذا كتبت «ان» بدون همزة ظهرت لك «إن» و«أن» معًا، وإذا كتبت «إن» بالهمزة ظهرت هي فقط، وهذا مفيد في المتشابهات. ونفس القاعدة مع الهاء والتاء المربوطة، ومع الياء والألف المقصورة.</p>
     </div>
     <div class="panel">
@@ -493,6 +502,37 @@ function moreSimilar(){
   SIM.shown+=part.length;const left=SIM.L.length-SIM.shown,b=$('#sim-more');
   b.hidden=left<=0;b.textContent='عرض المزيد ('+N(left)+' آية باقية)';
 }
+
+/* ---------- voice search (browser speech recognition; needs internet and microphone permission) ---------- */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null;
+const VERR={'not-allowed':'اسمح للتطبيق باستخدام الميكروفون من إعدادات المتصفح ثم حاول مرة أخرى.','service-not-allowed':'البحث بالصوت غير متاح في هذا المتصفح.',
+  'no-speech':'لم أسمع شيئًا. اضغط الميكروفون وتكلّم بوضوح.','audio-capture':'لم أجد ميكروفونًا على هذا الجهاز.','network':'البحث بالصوت يحتاج اتصالًا بالإنترنت.'};
+/* spoken text is spelled loosely, so match every hamza/taa/yaa form, then keep the longest run of words that exists in an ayah */
+function voiceQuery(t){
+  const w=norm(t).replace(/[أإآٱ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[^\u0621-\u064A ]/g,'').split(' ').filter(Boolean);
+  for(let k=w.length;k>=2;k--)for(let i=0;i+k<=w.length;i++){const q=w.slice(i,i+k).join(' '),re=plainRe(q);if(AY.some(a=>re.test(a.n)))return q}
+  return w.join(' ');
+}
+function toggleVoice(b){
+  if(rec){rec.stop();return}
+  const inp=$('#'+b.dataset.mic),note=$('#voice-note');let r,failed=false;
+  try{r=new SR()}catch(e){return}
+  r.lang='ar-EG';r.interimResults=true;r.maxAlternatives=1;r.continuous=false;
+  r.onresult=e=>{let t='';for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;inp.value=t.trim()};
+  r.onerror=e=>{if(e.error==='aborted')return;failed=true;note.textContent=VERR[e.error]||'تعذر البحث بالصوت. حاول مرة أخرى.';note.hidden=false};
+  r.onend=()=>{
+    rec=null;b.classList.remove('on');b.setAttribute('aria-pressed','false');
+    const heard=inp.value.trim();if(failed&&!heard){runSearch();return}
+    if(!heard){note.textContent=VERR['no-speech'];runSearch();return}
+    const q=voiceQuery(heard);inp.value=q;
+    if(q!==norm(heard)&&q.split(' ').length<norm(heard).split(' ').length){note.textContent='سمعت: «'+heard+'»، وبحثت عن أطول جزء موجود في الآيات.';note.hidden=false}else note.hidden=true;
+    runSearch();
+  };
+  if(typeof stopAudio==='function')stopAudio();
+  S.touched=true;$('#ex-note').hidden=true;inp.value='';note.textContent='تكلّم الآن… واضغط الميكروفون مرة أخرى للإنهاء.';note.hidden=false;
+  try{r.start();rec=r;b.classList.add('on');b.setAttribute('aria-pressed','true')}catch(e){note.textContent='تعذر تشغيل الميكروفون. حاول مرة أخرى.'}
+}
+function wireVoice(){if(!SR)return;for(const b of $$('.mic')){b.hidden=false;b.addEventListener('click',()=>toggleVoice(b))}}
 
 /* ---------- suras ---------- */
 function pct(s,min){const p=P[s.n];let k=0;for(const v of p)if(v>=min)k++;return Math.round(100*k/s.c)}
@@ -760,7 +800,7 @@ function wire(){
     $('#fs').innerHTML='<option value="0">كل السور</option>'+SURAS.map(s=>'<option value="'+s.n+'">'+N(s.n)+'. '+s.name+'</option>').join('');
     $('#fj').innerHTML='<option value="0">كل الأجزاء</option>'+Array.from({length:30},(_,k)=>'<option value="'+(k+1)+'">الجزء '+N(k+1)+'</option>').join('');
     $('#q1').value='سجيل';$('#q2').value='سجين';
-    wire();wireAudio();wireTheme();$('#boot').remove();runSearch();route();
+    wire();wireAudio();wireTheme();wireVoice();$('#boot').remove();runSearch();route();
     if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   }catch(e){$('#boot').innerHTML='<p>تعذر تحميل بيانات الآيات. تأكد من الاتصال بالإنترنت ثم أعد فتح الصفحة.</p>'}
 })();

@@ -1,5 +1,5 @@
 // Offline cache. Bump VERSION whenever any file changes so phones pick up the update.
-const VERSION = 'v5';
+const VERSION = 'v6';
 const FILES = ['./', 'index.html', 'quran.json', 'tafsir.json', 'manifest.webmanifest',
   'fonts/amiri-400.woff2', 'fonts/plex-400.woff2', 'fonts/plex-600.woff2',
   'fonts/cairo-400.woff2', 'fonts/cairo-600.woff2', 'fonts/tajawal-400.woff2', 'fonts/tajawal-700.woff2', 'fonts/almarai-400.woff2', 'fonts/almarai-700.woff2',
