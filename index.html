@@ -157,6 +157,13 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .about p{margin:0 0 8px} .about p:last-child{margin:0}
 .about h3{font-size:1rem;margin:0 0 6px}
 textarea.field{min-height:90px;font-size:.8rem;direction:ltr;font-family:ui-monospace,Menlo,Consolas,monospace}
+.ay.playing{background:var(--brand-soft)}
+.player{flex:none;background:var(--surface);border-top:1px solid var(--line);padding:8px 16px;display:flex;flex-direction:column;gap:6px}
+.player .r{display:flex;align-items:center;gap:8px;max-width:720px;width:100%;margin:0 auto}
+.player #pl-t{flex:1;font-size:.9rem;font-weight:600;overflow-wrap:anywhere}
+.player .field{min-height:38px;padding:4px 8px;font-size:.85rem;flex:1;min-width:0}
+.tog{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;min-height:34px;font-size:.82rem;color:var(--muted);white-space:nowrap}
+.tog[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--on-brand);font-weight:600}
 @media (min-width:560px){.sform{grid-template-columns:1fr auto 1fr;align-items:center}.sform .filters{grid-column:1/-1}}
 @media (prefers-reduced-motion:no-preference){.ay{transition:background-color .6s}}
 </style>
@@ -212,6 +219,7 @@ textarea.field{min-height:90px;font-size:.8rem;direction:ltr;font-family:ui-mono
       <h3>المصدر والحقوق</h3>
       <p>البيانات مأخوذة من ملف الإكسيل «الباحث القرآني» الإصدار v1 من إعداد <b>أحمد جمعة</b> (AGomaaInbox@Gmail.com). الملف مفتوح المصدر، ومشاركته مسموحة، واستخدامه للربح الشخصي غير مسموح.</p>
       <p>نص الآيات هنا إملائي وليس بالرسم العثماني، وراجعه صاحب الملف بمجهود فردي. استخدمه للبحث ثم ارجع إلى مصحفك للقراءة والحفظ.</p>
+      <p>التلاوات الصوتية من موقع mp3quran.net، والاستماع يحتاج اتصالًا بالإنترنت.</p>
     </div>
     <div class="panel">
       <h3>نسخة احتياطية من المتابعة</h3>
@@ -225,6 +233,14 @@ textarea.field{min-height:90px;font-size:.8rem;direction:ltr;font-family:ui-mono
     </div>
   </section>
 </main>
+
+<div class="player" id="player" hidden>
+  <div class="r"><span id="pl-t" aria-live="polite"></span><button class="btn ghost" type="button" id="pl-stop" style="min-height:36px;padding:4px 14px">إيقاف</button></div>
+  <div class="r"><select class="field" id="pl-read" aria-label="القارئ"></select>
+    <button class="tog" type="button" id="pl-rep" aria-pressed="false">تكرار الآية</button>
+    <button class="tog" type="button" id="pl-cont" aria-pressed="false">متابعة التلاوة</button></div>
+</div>
+<audio id="au" preload="none"></audio>
 
 <nav class="tabs" aria-label="أقسام التطبيق">
   <a href="#search" data-tab="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>بحث</a>
@@ -299,7 +315,7 @@ function row(a,re,cls){
     '<div class="ay-m">'+(re?'<a class="ref" href="#sura-'+a.s+'-'+a.a+'">'+s.name+' '+N(a.a)+'</a>':'')+
     '<span>جزء '+N(a.j)+' · صفحة '+N(a.p)+'</span><span class="sp"></span>'+
     '<button class="chip" type="button" data-act="stage" data-l="'+L+'"><i></i><span>'+STAGES[L]+'</span></button>'+
-    '<button class="lnk" type="button" data-act="taf" aria-expanded="false">التفسير</button></div><div class="taf" hidden></div></article>';
+    '<button class="lnk" type="button" data-act="play">استماع</button><button class="lnk" type="button" data-act="taf" aria-expanded="false">التفسير</button></div><div class="taf" hidden></div></article>';
 }
 async function toggleTafsir(art,btn){
   const box=$('.taf',art);
@@ -418,6 +434,81 @@ function applyStage(l){
   closeStage();
 }
 
+/* ---------- audio (mp3quran.net: one mp3 per sura + ayah timings in ms) ---------- */
+const API='https://www.mp3quran.net/api/v3/',AKEY='albaheth.audio.v1',au=$('#au');
+const A={read:123,rep:false,cont:false,reads:null,timing:{},cur:null,tok:0,timer:0};
+try{Object.assign(A,JSON.parse(localStorage.getItem(AKEY)||'{}'))}catch(e){}
+const saveAudio=()=>{try{localStorage.setItem(AKEY,JSON.stringify({read:A.read,rep:A.rep,cont:A.cont}))}catch(e){}};
+async function apiGet(path){
+  try{const r=await fetch(API+path);if(!r.ok)throw 0;return await r.json()}
+  catch(e){const r=await fetch('api/mp3quran?path='+encodeURIComponent(path));if(!r.ok)throw new Error('audio api');return r.json()}
+}
+async function getReads(){
+  if(A.reads)return A.reads;
+  let L=null;try{L=JSON.parse(localStorage.getItem(AKEY+'.reads'))}catch(e){}
+  if(!Array.isArray(L)||!L.length){
+    L=(await apiGet('ayat_timing/reads')).filter(r=>/حفص/.test(r.rewaya)&&r.soar_count===114).map(r=>({id:r.id,name:r.name,url:r.folder_url}));
+    if(!L.length)throw new Error('no reads');
+    try{localStorage.setItem(AKEY+'.reads',JSON.stringify(L))}catch(e){}
+  }
+  if(!L.some(r=>r.id===A.read))A.read=L[0].id;
+  $('#pl-read').innerHTML=L.map(r=>'<option value="'+r.id+'"'+(r.id===A.read?' selected':'')+'>'+esc(r.name)+'</option>').join('');
+  return A.reads=L;
+}
+async function getTiming(read,s){
+  const k=read+'-'+s;if(A.timing[k])return A.timing[k];
+  const m={};for(const t of await apiGet('ayat_timing?surah='+s+'&read='+read))m[t.ayah]=[t.start_time/1000,t.end_time/1000];
+  return A.timing[k]=m;
+}
+function markPlaying(){
+  for(const el of $$('.ay.playing'))el.classList.remove('playing');
+  if(A.cur)for(const el of $$('.ay[data-i="'+A.cur.a.i+'"]'))el.classList.add('playing');
+}
+function stopAudio(msg){
+  A.tok++;clearInterval(A.timer);au.pause();A.cur=null;markPlaying();
+  if(msg){$('#pl-t').textContent=msg;$('#player').hidden=false}else $('#player').hidden=true;
+}
+async function playAyah(a){
+  if(A.cur&&A.cur.a===a){stopAudio();return}
+  const tok=++A.tok;clearInterval(A.timer);au.pause();A.cur=null;markPlaying();
+  $('#player').hidden=false;$('#pl-t').textContent='جارٍ تحميل التلاوة…';
+  try{
+    const reads=await getReads(),rd=reads.find(r=>r.id===A.read),tm=await getTiming(rd.id,a.s);
+    if(tok!==A.tok)return;
+    const t=tm[a.a];if(!t)throw new Error('no timing');
+    const src=rd.url+String(a.s).padStart(3,'0')+'.mp3';
+    if(au.dataset.src!==src){
+      au.dataset.src=src;au.src=src;au.load();
+      await new Promise((ok,no)=>{au.addEventListener('loadedmetadata',ok,{once:true});au.addEventListener('error',no,{once:true})});
+      if(tok!==A.tok)return;
+    }
+    au.currentTime=t[0];await au.play();
+    if(tok!==A.tok)return;
+    A.cur={a,tm,end:t[1],start:t[0],rd};showNow();
+    A.timer=setInterval(tick,40);
+  }catch(e){
+    if(tok!==A.tok)return;
+    au.removeAttribute('data-src');
+    stopAudio(e&&e.name==='NotAllowedError'?'اضغط «استماع» مرة أخرى لبدء التلاوة.':'تعذر تشغيل التلاوة. الاستماع يحتاج اتصالًا بالإنترنت.');
+  }
+}
+function showNow(){$('#pl-t').textContent=SURAS[A.cur.a.s-1].name+' '+N(A.cur.a.a)+' · '+A.cur.rd.name;markPlaying()}
+function tick(){
+  const c=A.cur;if(!c)return;
+  if(au.currentTime<c.end-0.03&&!au.ended)return;
+  if(A.rep){au.currentTime=c.start;if(au.paused)au.play().catch(()=>stopAudio());return}
+  const nx=AY[c.a.i+1],t=nx&&nx.s===c.a.s&&c.tm[nx.a];
+  if(A.cont&&t){A.cur={a:nx,tm:c.tm,start:t[0],end:t[1],rd:c.rd};showNow();return}
+  stopAudio();
+}
+function wireAudio(){
+  const sync=()=>{$('#pl-rep').setAttribute('aria-pressed',A.rep);$('#pl-cont').setAttribute('aria-pressed',A.cont)};sync();
+  $('#pl-stop').addEventListener('click',()=>stopAudio());
+  $('#pl-rep').addEventListener('click',()=>{A.rep=!A.rep;if(A.rep)A.cont=false;sync();saveAudio()});
+  $('#pl-cont').addEventListener('click',()=>{A.cont=!A.cont;if(A.cont)A.rep=false;sync();saveAudio()});
+  $('#pl-read').addEventListener('change',e=>{A.read=+e.target.value;saveAudio();const a=A.cur&&A.cur.a;if(a){A.cur=null;playAyah(a)}});
+}
+
 /* ---------- routing ---------- */
 let view='';const scrolls={};
 function show(name,a,b){
@@ -450,6 +541,7 @@ function wire(){
   $('#main').addEventListener('click',e=>{
     const b=e.target.closest('[data-act]');if(!b)return;
     if(b.dataset.act==='taf')toggleTafsir(b.closest('.ay'),b);
+    else if(b.dataset.act==='play')playAyah(AY[b.closest('.ay').dataset.i]);
     else if(b.dataset.act==='range')openStage({mode:'range',s:+b.dataset.s});
     else{const a=AY[(b.closest('[data-i]')).dataset.i];openStage({mode:'one',s:a.s,a:a.a})}
   });
@@ -480,7 +572,7 @@ function wire(){
     $('#fs').innerHTML='<option value="0">كل السور</option>'+SURAS.map(s=>'<option value="'+s.n+'">'+N(s.n)+'. '+s.name+'</option>').join('');
     $('#fj').innerHTML='<option value="0">كل الأجزاء</option>'+Array.from({length:30},(_,k)=>'<option value="'+(k+1)+'">الجزء '+N(k+1)+'</option>').join('');
     $('#q1').value='سجيل';$('#q2').value='سجين';
-    wire();$('#boot').remove();runSearch();route();
+    wire();wireAudio();$('#boot').remove();runSearch();route();
     if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
   }catch(e){$('#boot').innerHTML='<p>تعذر تحميل بيانات الآيات. تأكد من الاتصال بالإنترنت ثم أعد فتح الصفحة.</p>'}
 })();
