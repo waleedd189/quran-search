@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#137a70"/><stop offset="1" stop-color="#083b37"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3d27a"/><stop offset="1" stop-color="#c08a1e"/></linearGradient>
+    <radialGradient id="lens" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#0f655d"/><stop offset="1" stop-color="#06302c"/></radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g fill="none" stroke="#f3d27a" stroke-opacity=".10" stroke-width="3">
+    <rect x="56" y="56" width="400" height="400"/><rect x="56" y="56" width="400" height="400" transform="rotate(45 256 256)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.1) translate(-265 -241)">
+  <!-- handle -->
+  <path d="M190 315 L140 365" stroke="#06302c" stroke-opacity=".35" stroke-width="46" stroke-linecap="round" transform="translate(4 6)"/>
+  <path d="M190 315 L140 365" stroke="url(#gold)" stroke-width="40" stroke-linecap="round"/>
+  <!-- star lens -->
+  <g transform="translate(280 225)">
+    <g fill="#06302c" fill-opacity=".3" transform="translate(4 6)"><rect x="-96" y="-96" width="192" height="192"/><rect x="-96" y="-96" width="192" height="192" transform="rotate(45)"/></g>
+    <g fill="url(#gold)"><rect x="-96" y="-96" width="192" height="192"/><rect x="-96" y="-96" width="192" height="192" transform="rotate(45)"/></g>
+    <circle r="86" fill="url(#lens)"/>
+    <circle r="86" fill="none" stroke="#fff3cf" stroke-opacity=".55" stroke-width="3"/>
+    <!-- open book -->
+    <g>
+      <path d="M0 -30 C-18 -44 -42 -46 -62 -38 L-62 34 C-42 26 -18 28 0 42 Z" fill="#fbf6e6"/>
+      <path d="M0 -30 C18 -44 42 -46 62 -38 L62 34 C42 26 18 28 0 42 Z" fill="#efe6c8"/>
+      <path d="M0 -30 L0 42" stroke="#0e5c55" stroke-width="3"/>
+      <g stroke="#0e5c55" stroke-opacity=".5" stroke-width="4" stroke-linecap="round" fill="none">
+        <path d="M-50 -22 C-36 -27 -22 -25 -11 -18"/><path d="M-50 -6 C-36 -11 -22 -9 -11 -2"/><path d="M-50 10 C-36 5 -22 7 -11 14"/>
+        <path d="M50 -22 C36 -27 22 -25 11 -18"/><path d="M50 -6 C36 -11 22 -9 11 -2"/><path d="M50 10 C36 5 22 7 11 14"/>
+      </g>
+    </g>
+  </g>
+  </g>
+</svg>
